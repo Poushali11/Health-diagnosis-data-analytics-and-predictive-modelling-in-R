@@ -1,0 +1,182 @@
+---
+title: "AIBL_Dataset Analysis"
+author: "Anonymous"
+output: html_document
+---
+
+```{r}
+library(readr)
+aibl_apoeres_01_Jun_2018 <-read.csv("C:/Users/newuser.LAPTOP-JVLU65UC/Desktop/Freelance/aibl_apoeres_01-Jun-2018.csv")
+aibl_cdr_01_Jun_2018<- read.csv("C:/Users/newuser.LAPTOP-JVLU65UC/Desktop/Freelance/aibl_cdr_01-Jun-2018.csv")
+aibl_labdata_01_Jun_2018<-read.csv("C:/Users/newuser.LAPTOP-JVLU65UC/Desktop/Freelance/aibl_labdata_01-Jun-2018.csv")
+aibl_medhist_01_Jun_2018<-read.csv("C:/Users/newuser.LAPTOP-JVLU65UC/Desktop/Freelance/aibl_medhist_01-Jun-2018.csv")
+aibl_mmse_01_Jun_2018<- read.csv("C:/Users/newuser.LAPTOP-JVLU65UC/Desktop/Freelance/aibl_mmse_01-Jun-2018.csv")
+aibl_neurobat_01_Jun_2018<-read.csv("C:/Users/newuser.LAPTOP-JVLU65UC/Desktop/Freelance/aibl_neurobat_01-Jun-2018.csv")
+aibl_ptdemog_01_Jun_2018<-read.csv("C:/Users/newuser.LAPTOP-JVLU65UC/Desktop/Freelance/aibl_ptdemog_01-Jun-2018.csv")
+aibl_pdxconv_01_Jun_2018<-read.csv("C:/Users/newuser.LAPTOP-JVLU65UC/Desktop/Freelance/aibl_pdxconv_01-Jun-2018.csv")
+
+#Merge the data
+library(tidyverse)
+df_list<- list(aibl_apoeres_01_Jun_2018,aibl_cdr_01_Jun_2018,aibl_labdata_01_Jun_2018,aibl_medhist_01_Jun_2018,aibl_mmse_01_Jun_2018,aibl_neurobat_01_Jun_2018,aibl_ptdemog_01_Jun_2018,aibl_pdxconv_01_Jun_2018)
+total<-df_list %>% reduce(inner_join,by='RID')
+dim(total)
+summary(total)
+glimpse(total)
+str(total)
+
+#Replacing both MCI and AD label as 2 in the target variable
+total$DXCURREN[total$DXCURREN == 3]<-2
+total$DXCURREN[total$DXCURREN == 7]<-2
+total$DXCURREN[total$DXCURREN ==-4]<-2
+library(dplyr)
+table(total['DXCURREN'])
+total %>%
+  count(DXCURREN)
+#Typecasting date type columns
+total$EXAMDATE<-as.Date(total$EXAMDATE,'%m/%d/%Y')
+total$EXAMDATE.x<-as.Date(total$EXAMDATE.x,'%m/%d/%Y')
+total$EXAMDATE.y<-as.Date(total$EXAMDATE.y,'%m/%d/%Y')
+
+#Missing values
+sum(is.na(total))
+newdata<-na.omit(total)
+
+#Removing all duplicates
+newdata<-distinct(newdata)
+dim(newdata)
+#Checking categorical string columns
+str(newdata)
+table(newdata['VISCODE.x'])
+
+table(newdata['VISCODE.y'])
+table(newdata['VISCODE.x.x'])
+table(newdata['VISCODE.x.x.x.x'])
+table(newdata['VISCODE.y.y.y.y'])
+table(newdata['PTDOB'])
+table(newdata['APTESTDT'])
+
+#More cleansing of data
+newdata$APTESTDT<- as.Date(newdata$APTESTDT, '%m/%d/%Y')
+newdata$PTDOB<- gsub("/","", as.character(newdata$PTDOB))
+newdata$PTDOB<- as.integer(newdata$PTDOB)
+
+#Removing character data with 0 variance
+newdata<- subset(newdata, select=-c(VISCODE.x,VISCODE.x.x.x.x,VISCODE.x.x.x,VISCODE.y.y))
+dim(newdata)
+
+#Encoding categorical data
+str(newdata)
+newdata$VISCODE.y<- factor(newdata$VISCODE.y, levels=c('bl','m18','m36','m54','m72'),labels=c(1,2,3,4,5))
+newdata$VISCODE.x.x<- factor(newdata$VISCODE.x.x, levels=c('bl','m18','m36','m54','m72'),labels=c(1,2,3,4,5))
+newdata$VISCODE.y.y.y.y<- factor(newdata$VISCODE.y.y.y.y, levels=c('bl','m18','m36','m54','m72'),labels=c(1,2,3,4,5))
+newdata$VISCODE.y.y.y<- factor(newdata$VISCODE.y.y.y, levels=c('bl','m18','m36','m54','m72'),labels=c(1,2,3,4,5))
+str(newdata)
+
+#Converting factor to numeric data type
+newdata$VISCODE.y<-as.numeric(newdata$VISCODE.y)
+newdata$VISCODE.x.x<-as.numeric(newdata$VISCODE.x.x)
+newdata$VISCODE.y.y.y.y<-as.numeric(newdata$VISCODE.y.y.y.y)
+newdata$VISCODE.y.y.y<-as.numeric(newdata$VISCODE.y.y.y)
+str(newdata)
+#Correlation Analysis
+nwd<-subset(newdata, select=-c(APTESTDT,EXAMDATE.x,EXAMDATE.y,EXAMDATE))
+str(nwd)
+dim(nwd)
+library(corrplot)
+library(RColorBrewer)
+source("http://www.sthda.com/upload/rquery_cormat.r")
+mdata<-nwd[,c(3,4,7,10,11,12,13,14,15,16,17,18,19,20,21,34,37,38,40,44)]
+require("corrplot")
+rquery.cormat(mdata)
+
+rquery.cormat(mdata, type="full")
+
+```
+
+Comments: The correlation plot shows the correlation among the chosen variables. As we can see from the graph, the multicollinearity problem is not high among the variables
+
+```{r}
+library(DataExplorer)
+#Removing the RID, SITEID
+nw<- select(nwd, -RID,-SITEID.x,-SITEID.y,-SITEID.x.x,-SITEID.y.y,-SITEID.x.x.x,-SITEID.y.y.y,-SITEID.x.x.x.x,-SITEID.y.y.y.y)
+
+head(nw)
+str(nw)
+
+#Visualizations
+plot_str(nw)
+plot_bar(nw)
+plot_bar(nw,by="DXCURREN")
+plot_boxplot(nw,by="DXCURREN")
+plot_correlation(nw)
+
+```
+
+Comments: The plotted bar graph, stacked bar with respect to binary target variable , boxlot w.r.t to target variable and correlation plot has been shown.
+
+```{r}
+
+#Typecasting target variable as factor
+typeof(nw$DXCURREN)
+nw$DXCURREN<-as.factor(nw$DXCURREN)
+
+#Blood analysis density plot with respect to Diagnosis
+
+library(caret)
+library(lattice)
+xyplot(DXCURREN~HMT3,data=nw)
+xyplot(DXCURREN~AXT117,data=nw)
+xyplot(DXCURREN~RCT6,data=nw)
+```
+
+Comments: The scatter plot has shown the density distribution of red blood cells,thyroid stim. hormone and urea nitrogen with respect to diagnosis.
+
+```{r}
+#Density plot of blood analysis
+dens <- density(nw$RCT20)
+plot(dens,col='steelblue',main="Density plot of RCT20")
+
+dens1 <- density(nw$RCT11)
+plot(dens1,col='steelblue',main="Density plot of RCT11")
+
+dens2<-density(nw$BAT126)
+plot(dens2,col='steelblue',main="Density plot of BAT126")
+```
+Comments:The density distribution cholestrol,serum glucose and vitamin B12
+
+```{r}
+str(nw)
+#Removing unnecessary variables
+nw <- subset(nw,select=-c(VISCODE.y,VISCODE.x.x,VISCODE.y.y.y,VISCODE.y.y.y.y,PTDOB))
+dim(nw)
+str(nw)
+#Imbalanced data check
+prop.table(table(nw$DXCURREN))
+```
+Comments: Data distribution of the target variable class. Data is imbalanced.
+
+```{r}
+#Validation for preprocessing
+#Logistic regression model
+set.seed(100)
+library(caTools)
+spl<-sample.split(nw$DXCURREN,SplitRatio=0.7)
+train<-subset(nw,spl==TRUE)
+test<- subset(nw,spl==FALSE)
+dim(train)
+dim(test)
+model_glm <-glm(DXCURREN~ . ,family='binomial',data=train)
+summary(model_glm)
+#predictions 
+predictTrain <- predict(model_glm,data=train,type="response")
+#confusion matrix
+table(train$DXCURREN,predictTrain>=0.5)
+(189414+40325)/nrow(train)
+#Predictions on test set
+predictTest= predict(model_glm,newdata=test,type="response")
+#Confusion matrix
+table(test$DXCURREN, predictTest>=0.5)
+(81224+17299)/nrow(test)
+
+```
+Comments: Our preprocessing has been quite well , as both test and train data have given around 92% accuracy.
